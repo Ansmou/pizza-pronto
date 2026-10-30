@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f3e3c3">
+<title>🍕 Pizza Pronto — run your pizzeria!</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍕</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{margin:0;overflow:hidden;font-family:'Quicksand','Segoe UI',sans-serif;color:#4a3520;
+       background:#f3e3c3;display:flex;justify-content:center;align-items:center}
+  #stage{position:relative;width:100vw;height:100vh;height:100dvh;overflow:hidden;
+         background:linear-gradient(180deg,#f7ead2 0%,#f0dcba 60%,#e8d0a8 100%)}
+  #stage::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:70;opacity:.45;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .4 0 0 0 0 .28 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* ---------- top bar ---------- */
+  #hud{position:absolute;top:calc(8px + env(safe-area-inset-top));left:10px;right:10px;z-index:20;
+       display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .pill{background:rgba(255,251,240,.92);border:2.5px solid #d9b98a;border-radius:999px;
+        padding:5px 12px;font-weight:700;font-size:.85rem;color:#6b4a26;box-shadow:0 2px 6px rgba(90,60,20,.12)}
+  #shopBtn{font-family:inherit;font-weight:700;font-size:.8rem;border:2.5px solid #c98d4a;background:#ffd98f;
+           border-radius:999px;padding:5px 12px;color:#6b3a10;cursor:pointer;box-shadow:0 3px 0 #c98d4a}
+
+  /* ---------- order queue ---------- */
+  #queue{position:absolute;top:calc(48px + env(safe-area-inset-top));left:8px;right:8px;z-index:15;
+         display:flex;gap:7px;overflow-x:auto;padding:3px 2px;scrollbar-width:none}
+  #queue::-webkit-scrollbar{display:none}
+  .ocard{flex:0 0 auto;width:150px;background:rgba(255,251,240,.96);border:2.5px solid #d9b98a;border-radius:14px;
+         padding:6px 8px;position:relative;transition:transform .15s}
+  .ocard.active{border-color:#e2574c;box-shadow:0 0 0 3px rgba(226,87,76,.25);transform:scale(1.04)}
+  .ocard .row1{display:flex;align-items:center;gap:5px}
+  .ocard .ava{font-size:1.3rem}
+  .ocard .nm{font-weight:700;font-size:.72rem;color:#5a3d1c;line-height:1.05}
+  .ocard .req{font-size:.62rem;font-weight:700;color:#8a6a3f;margin-top:2px;line-height:1.25}
+  .ocard .pat{height:7px;border-radius:4px;background:#ecd9b4;margin-top:4px;overflow:hidden}
+  .ocard .patf{height:100%;background:linear-gradient(90deg,#7fc26a,#a8d86f);border-radius:4px}
+  .ocard .face{position:absolute;top:5px;right:6px;font-size:.9rem}
+  .ocard.gone{opacity:0;transform:scale(.7);transition:all .4s}
+
+  /* ---------- kitchen ---------- */
+  #counter{position:absolute;left:0;right:0;top:calc(118px + env(safe-area-inset-top));bottom:212px;z-index:5;
+           display:flex;justify-content:center;align-items:center}
+  #pizzaWrap{position:relative;width:min(64vw,300px);height:min(64vw,300px)}
+  #pizzaWrap svg{width:100%;height:100%;display:block;filter:drop-shadow(0 8px 14px rgba(90,50,10,.25))}
+  #buildHint{position:absolute;left:50%;transform:translateX(-50%);top:-4px;z-index:16;
+             background:#fff;border:2.5px dashed #e2574c;border-radius:999px;padding:4px 14px;
+             font-size:.78rem;font-weight:700;color:#b0402f;white-space:nowrap}
+  /* oven */
+  #oven{position:absolute;right:10px;top:calc(128px + env(safe-area-inset-top));z-index:14;width:86px;
+        background:linear-gradient(180deg,#c96b3f,#a3512b);border:3px solid #7a3a1c;border-radius:14px;
+        padding:6px;text-align:center;box-shadow:0 5px 12px rgba(90,50,10,.3)}
+  #oven .door{height:52px;border-radius:9px;background:linear-gradient(180deg,#5a2c12,#7a3a1c);
+              border:2.5px solid #4a2008;position:relative;overflow:hidden;margin-bottom:4px}
+  #oven .glow{position:absolute;inset:4px;border-radius:7px;background:radial-gradient(circle at 50% 70%,#ffb64d,#e2732c 70%);
+              opacity:.25;transition:opacity .3s}
+  #oven.baking .glow{opacity:.95;animation:flick .5s infinite alternate}
+  @keyframes flick{from{filter:brightness(.92)}to{filter:brightness(1.12)}}
+  #oven .bakeBar{height:9px;border-radius:5px;background:#4a2008;overflow:hidden;margin:0 2px 4px}
+  #oven .bakeFill{height:100%;width:0%;background:#7fc26a}
+  #oven .zone{position:absolute;top:0;bottom:0;border-radius:5px}
+  #ovenBtn{font-family:inherit;font-weight:700;font-size:.72rem;border:2px solid #7a3a1c;border-radius:9px;
+           background:#ffd98f;color:#6b3a10;padding:5px 4px;cursor:pointer;width:100%}
+
+  /* ---------- ingredient bins ---------- */
+  #bins{position:absolute;left:0;right:0;bottom:0;z-index:20;height:200px;
+        background:linear-gradient(180deg,#e8d0a8,#dcc494);border-top:4px solid #c9a86f;
+        border-radius:20px 20px 0 0;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+  #binsLabel{font-size:.62rem;font-weight:700;letter-spacing:1px;color:#8a6a3f;margin:0 4px 4px;text-transform:uppercase}
+  #binRow{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}
+  #binRow::-webkit-scrollbar{display:none}
+  .bin{flex:0 0 auto;width:66px;height:92px;border:2.5px solid #c9a86f;border-radius:13px;background:#fffdf6;
+       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:grab;
+       touch-action:none;position:relative}
+  .bin .em{font-size:1.6rem;pointer-events:none}
+  .bin .nm{font-size:.56rem;font-weight:700;color:#6b4a26;pointer-events:none;line-height:1}
+  .bin .cnt{position:absolute;top:-7px;right:-4px;background:#e2574c;color:#fff;border-radius:999px;
+            font-size:.58rem;font-weight:700;padding:1px 6px;min-width:16px}
+  .bin:active{transform:scale(.94)}
+
+  /* hand-off button */
+  #handBtn{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(216px + env(safe-area-inset-bottom));
+           z-index:19;display:none;font-family:inherit;font-weight:700;font-size:.95rem;border:none;
+           border-radius:999px;padding:11px 26px;background:linear-gradient(180deg,#9db38f,#6f9c62);color:#fff;
+           cursor:pointer;box-shadow:0 5px 0 #4f7a44;animation:bounceIn .5s}
+  #handBtn:active{transform:translateX(-50%) translateY(3px);box-shadow:0 2px 0 #4f7a44}
+  @keyframes bounceIn{0%{transform:translateX(-50%) scale(.6)}70%{transform:translateX(-50%) scale(1.08)}100%{transform:translateX(-50%) scale(1)}}
+
+  /* ---------- map overlay ---------- */
+  #mapOv{position:absolute;inset:0;z-index:30;background:rgba(60,40,15,.55);display:none;
+         align-items:center;justify-content:center}
+  #mapOv.show{display:flex}
+  #mapCard{background:#f7ead2;border:4px solid #c9a86f;border-radius:22px;width:min(92vw,380px);
+           padding:14px 12px 14px;text-align:center;position:relative}
+  #mapCard h2{margin:0 0 6px;font-size:1.05rem}
+  #mapSvg{width:100%;height:auto;border-radius:14px;background:#cfe3c0;border:3px solid #a8c58f}
+  #mapMsg{font-size:.8rem;font-weight:700;color:#6b4a26;margin-top:6px;min-height:1.2em}
+
+  /* ---------- overlays ---------- */
+  .ov{position:absolute;inset:0;background:rgba(60,40,15,.55);display:none;align-items:center;justify-content:center;
+      z-index:40;padding:16px}
+  .ov.show{display:flex}
+  .card{background:#fffdf6;border:3.5px solid #c9a86f;border-radius:22px;max-width:340px;width:100%;
+        padding:18px 16px 16px;text-align:center;max-height:92vh;overflow-y:auto}
+  .card h1{margin:0 0 4px;font-size:1.25rem;color:#5a3d1c}
+  .card p{margin:5px 0;font-size:.84rem;font-weight:600;line-height:1.4;color:#6b4a26}
+  .card button{font-family:inherit;font-weight:700;font-size:.95rem;border:none;border-radius:999px;
+        padding:10px 22px;background:linear-gradient(180deg,#f0a05a,#dd7f3c);color:#fff;cursor:pointer;
+        box-shadow:0 4px 0 #b55f22;margin:6px 3px 0}
+  .card button.green{background:linear-gradient(180deg,#9db38f,#6f9c62);box-shadow:0 4px 0 #4f7a44}
+  .card button:active{transform:translateY(3px);box-shadow:0 1px 0 #b55f22}
+  .stars{font-size:1.7rem;margin:2px 0}
+  .pulse{animation:pulseR 1.2s ease-in-out infinite}
+  @keyframes pulseR{0%,100%{opacity:.9;r:22}50%{opacity:.3;r:30}}
+  .shopItem{display:flex;gap:9px;align-items:center;border:2.5px solid #e0c9a0;border-radius:14px;
+        padding:8px 10px;margin:7px 0;cursor:pointer;background:#fff;text-align:left}
+  .shopItem.owned{opacity:.55;cursor:default}
+  .shopItem .ic{font-size:1.7rem}
+  .shopItem .nm{font-weight:700;font-size:.84rem}
+  .shopItem .ds{font-size:.66rem;font-weight:600;color:#8a6a3f;line-height:1.25}
+  .shopItem .pr{margin-left:auto;font-weight:700;color:#b0732a;font-size:.8rem;white-space:nowrap}
+  #toast{position:absolute;left:50%;top:38%;transform:translateX(-50%);z-index:45;display:none;
+         background:#fffdf6;border:3px solid #e2574c;border-radius:16px;padding:10px 18px;
+         font-weight:700;color:#5a3d1c;font-size:.9rem;text-align:center;box-shadow:0 8px 20px rgba(60,30,0,.3);max-width:86%}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="hud">
+    <span class="pill">🪙 <span id="coinTxt">0</span></span>
+    <span class="pill" id="dayPill">Day 1</span>
+    <button id="shopBtn">🛒 Shop</button>
+  </div>
+
+  <div id="queue"></div>
+
+  <div id="oven">
+    <div class="door"><div class="glow"></div></div>
+    <div class="bakeBar" id="bakeBar"><div class="bakeFill" id="bakeFill"></div></div>
+    <button id="ovenBtn">🪵 BAKE</button>
+  </div>
+
+  <div id="counter">
+    <div id="pizzaWrap">
+      <svg id="pizzaSvg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="crustG" cx=".5" cy=".5" r=".5">
+            <stop offset=".82" stop-color="#e8b96a"/><stop offset="1" stop-color="#c98d4a"/>
+          </radialGradient>
+          <filter id="psoft" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#7a4a10" flood-opacity=".2"/>
+          </filter>
+        </defs>
+        <g id="gDough"></g>
+        <g id="gSauce"></g>
+        <g id="gCheese"></g>
+        <g id="gTop"></g>
+      </svg>
+      <div id="buildHint">Take an order! 📋</div>
+    </div>
+  </div>
+
+  <button id="handBtn">🛵 Hand to Zippy!</button>
+
+  <div id="bins">
+    <div id="binsLabel">Ingredients — drag onto the pizza · cheese: tap tap tap!</div>
+    <div id="binRow"></div>
+  </div>
+
+  <div id="mapOv">
+    <div id="mapCard">
+      <h2 id="mapTitle">🗺️ Delivery time!</h2>
+      <svg id="mapSvg" viewBox="0 0 340 300" xmlns="http://www.w3.org/2000/svg">
+        <g id="mapG"></g>
+      </svg>
+      <div id="mapMsg"></div>
+    </div>
+  </div>
+
+  <div class="ov show" id="startOv">
+    <div class="card">
+      <h1>🍕 PIZZA PRONTO</h1>
+      <p>You own a little pizzeria! Customers phone in orders — <b>build</b> their pizza, <b>bake</b> it just right, and hand it to <b>Zippy</b> the delivery scooter before patience runs out!</p>
+      <p>🥄 Drag the sauce ladle across the dough<br>🧀 Tap the cheese bin<br>🍗 Drag toppings on — count them!<br>🔥 Stop the bake bar in the <b>green</b>!<br>🛵 Then Zippy zooms off to deliver!</p>
+      <p>Earn 🪙 coins → new recipes, better oven, a 2nd scooter!</p>
+      <button id="btnStart">▶ OPEN THE SHOP</button>
+    </div>
+  </div>
+
+  <div class="ov" id="dayOv">
+    <div class="card">
+      <h1 id="dayTitle">☀️ Day 1</h1>
+      <p id="dayText"></p>
+      <button id="btnDay">▶ Start serving!</button>
+    </div>
+  </div>
+
+  <div class="ov" id="sumOv">
+    <div class="card">
+      <h1 id="sumTitle">🌙 Day complete!</h1>
+      <div class="stars" id="sumStars">⭐⭐⭐</div>
+      <p id="sumText"></p>
+      <button id="btnShop">🛒 Visit shop</button>
+      <button id="btnNext" class="green">▶ Next day</button>
+    </div>
+  </div>
+
+  <div class="ov" id="shopOv">
+    <div class="card">
+      <h1>🛒 Pizza Shop</h1>
+      <p>🪙 <b id="shopCoins">0</b> coins</p>
+      <div id="shopList"></div>
+      <button id="btnShopClose" class="green">▶ Back to work</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+<script>
+(function(){
+'use strict';
+window.__errs=[];
+window.onerror=(m,s,l)=>{window.__errs.push(m+' @'+l);};
+const $=id=>document.getElementById(id);
+const SVGNS='http://www.w3.org/2000/svg';
+const R=Math.random;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function el(tag,attrs,parent){const n=document.createElementNS(SVGNS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);parent.appendChild(n);return n;}
+
+/* ---------------- data ---------------- */
+const TOPPINGS={
+  chicken:{n:'Chicken',e:'🍗',col:'#c98d4a',shape:'chunk'},
+  pepperoni:{n:'Beef Pepperoni',e:'🔴',col:'#d64545',shape:'disc'},
+  mushroom:{n:'Mushroom',e:'🍄',col:'#e8d9c4',shape:'mush'},
+  pepper:{n:'Pepper',e:'🫑',col:'#5fae4f',shape:'ring'},
+  olive:{n:'Olives',e:'🫒',col:'#4a4a3a',shape:'ring'},
+  pineapple:{n:'Pineapple',e:'🍍',col:'#ffd45e',shape:'chunk'},
+  onion:{n:'Onion',e:'🧅',col:'#f0e3f5',shape:'ring'},
+  tomato:{n:'Tomato',e:'🍅',col:'#e2574c',shape:'disc'},
+  basil:{n:'Basil',e:'🌿',col:'#4f8a3f',shape:'leaf'},
+};
+const RECIPES={
+  margherita:{n:'Margherita',e:'🍕',price:0,tops:{tomato:4,basil:3}},
+  cheeselover:{n:'Cheese Lover',e:'🧀',price:0,tops:{},extraCheese:true},
+  veggie:{n:'Garden Veggie',e:'🥬',price:15,tops:{mushroom:5,pepper:4,olive:4}},
+  tikka:{n:'Chicken Tikka',e:'🍗',price:20,tops:{chicken:6,onion:4}},
+  pep:{n:'Beef Pepperoni',e:'🔴',price:20,tops:{pepperoni:6,olive:3}},
+  hawaiian:{n:'Chicken & Pineapple',e:'🍍',price:25,tops:{chicken:5,pineapple:5}},
+};
+const NAMES=['Omar','Layla','Bilal','Sofia','Adam','Noor','Yusuf','Maryam','Zaid','Aisha','Hamza','Khadija'];
+const AVAS=['👦','👧','🧔','👩','👨','🧒','👵','👴'];
+const HOUSES=[[70,70],[250,60],[60,200],[180,160],[300,190],[160,262]];
+
+/* ---------------- state ---------------- */
+const S={started:false,day:1,coins:12,orders:[],activeOrder:null,orderN:0,ordersLeft:0,
+        served:0,walked:0,stars:0,upgrades:{},recipes:{margherita:true,cheeselover:true},
+        scooters:[{busy:0},{busy:0}],build:null,bake:null,paused:false,sound:true,phase:'idle'};
+
+function save(){try{localStorage.setItem('pizzaPronto',JSON.stringify(
+  {day:S.day,coins:S.coins,upgrades:S.upgrades,recipes:S.recipes,scooters:S.scooters}));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem('pizzaPronto'));
+  if(d){S.day=d.day||1;S.coins=d.coins??12;S.upgrades=d.upgrades||{};
+        S.recipes=d.recipes||{margherita:true,cheeselover:true};S.scooters=d.scooters||[{busy:0},{busy:0}];}}catch(e){}}
+load();
+const ovenSpeed=()=>1-(S.upgrades.fastoven?.28:0);
+const zoneW=()=>S.upgrades.ovenmitts?.30:.20;
+
+/* ---------------- audio ---------------- */
+let AC=null,master=null;
+function audioInit(){
+  if(!S.sound)return null;
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain();master.gain.value=.5;master.connect(AC.destination);}catch(e){return null;}}
+  if(AC.state==='suspended')AC.resume();
+  return AC;
+}
+function tone(f,dur,type='sine',vol=.22,when=0,glide){
+  const ac=audioInit();if(!ac)return;
+  const t=ac.currentTime+when,o=ac.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.setValueAtTime(f,t);
+  if(glide)o.frequency.exponentialRampToValueAtTime(glide,t+dur);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.05);
+}
+const sDing=()=>{tone(880,.09,'sine',.25);tone(1175,.14,'sine',.25,.09);};
+const sCoin=()=>{tone(988,.07,'triangle',.22);tone(1319,.12,'triangle',.22,.07);};
+const sSizzle=()=>tone(300,.35,'sawtooth',.07,0,120);
+const sPop=()=>tone(520,.05,'triangle',.18);
+const sZoom=()=>tone(180,.7,'sawtooth',.12,0,640);
+const sBell=()=>{tone(1568,.12,'sine',.28);tone(2093,.25,'sine',.28,.12);};
+const sSad=()=>{tone(392,.16,'sine',.2);tone(311,.28,'sine',.2,.16);};
+const sYay=()=>{tone(659,.12,'sine',.26);tone(784,.12,'sine',.26,.11);tone(1047,.22,'sine',.28,.22);};
+
+/* ---------------- pizza build ---------------- */
+const PZ={cx:150,cy:150,r:132};
+function newBuild(order){
+  const b={order,
+    sauceCells:new Set(),cheese:0,cheeseNeed:order.extraCheese?5:3,
+    tops:{},wrong:0,pieces:[],state:'build'};
+  Object.keys(order.recipe.tops).forEach(t=>b.tops[t]=0);
+  return b;
+}
+function drawDough(){
+  const g=$('gDough');g.innerHTML='';
+  el('circle',{cx:PZ.cx,cy:PZ.cy,r:PZ.r,fill:'url(#crustG)',stroke:'#b5773a','stroke-width':3,filter:'url(#psoft)'},g);
+  el('circle',{cx:PZ.cx,cy:PZ.cy,r:PZ.r-16,fill:'#f2dfae',stroke:'#e0c689','stroke-width':2},g);
+  for(let i=0;i<26;i++){ // crust texture
+    const a=i/26*Math.PI*2;
+    el('circle',{cx:PZ.cx+Math.cos(a)*(PZ.r-8),cy:PZ.cy+Math.sin(a)*(PZ.r-8),r:2.5,fill:'#d9a45c',opacity:.7},g);
+  }
+}
+function sauceCell(x,y){return Math.floor(x/66)+'_'+Math.floor(y/66);}
+function paintSauce(px,py){ // px,py in svg coords
+  const b=S.build;if(!b||b.state!=='sauce'&&b.state!=='build')return;
+  const d=Math.hypot(px-PZ.cx,py-PZ.cy);
+  if(d>PZ.r-22)return;
+  b.state='sauce';
+  b.sauceCells.add(sauceCell(px,py));
+  const g=$('gSauce');
+  el('circle',{cx:px,cy:py,r:26,fill:'#d6453a',opacity:.85},g);
+  if(b.sauceCells.size===9&&!b.sauceDone){
+    b.sauceDone=true;toast('Sauce done! 🥄 Now tap the CHEESE! 🧀');sPop();
+  }
+}
+function addCheese(){
+  const b=S.build;if(!b||b.sauceCells.size<9){toast('Spread the sauce first! Swipe the ladle 🥄');return;}
+  b.cheese++;
+  sPop();
+  const g=$('gCheese');
+  for(let i=0;i<9;i++){
+    const a=R()*Math.PI*2,d=R()*(PZ.r-34);
+    el('rect',{x:PZ.cx+Math.cos(a)*d,y:PZ.cy+Math.sin(a)*d,width:6,height:4,rx:1.5,
+      fill:R()<.5?'#ffd45e':'#f5c542',transform:`rotate(${R()*90} ${PZ.cx+Math.cos(a)*d} ${PZ.cy+Math.sin(a)*d})`},g);
+  }
+  if(b.cheese>=b.cheeseNeed&&!b.cheeseDone){
+    b.cheeseDone=true;
+    const t=Object.keys(b.order.recipe.tops);
+    toast(t.length?'Cheese done! Now drag the toppings on 🍗':'Cheese done! Into the oven! 🔥');
+  }
+}
+function dropTopping(kind,px,py){
+  const b=S.build;if(!b)return;
+  if(!b.sauceCells.size||!b.cheeseDone){toast('Sauce and cheese first! 🥄🧀');return;}
+  const need=b.order.recipe.tops[kind]||0;
+  const have=b.tops[kind]||0;
+  if(have>=need){b.wrong++;toast('That\u2019s enough '+TOPPINGS[kind].n+'!');sSad();return;}
+  b.tops[kind]=have+1;
+  drawPiece(kind,px,py);
+  sPop();
+  const total=Object.values(b.tops).reduce((a,c)=>a+c,0);
+  const totalNeed=Object.values(b.order.recipe.tops).reduce((a,c)=>a+c,0);
+  if(total>=totalNeed&&!b.topsDone){b.topsDone=true;toast('Perfect! Into the OVEN! 🔥');sDing();}
+}
+function drawPiece(kind,px,py){
+  const t=TOPPINGS[kind],g=$('gTop');
+  const d=Math.hypot(px-PZ.cx,py-PZ.cy);
+  if(d>PZ.r-26){const k=(PZ.r-26)/d;px=PZ.cx+(px-PZ.cx)*k;py=PZ.cy+(py-PZ.cy)*k;}
+  if(t.shape==='disc'){
+    el('circle',{cx:px,cy:py,r:9,fill:t.col,stroke:'rgba(0,0,0,.15)','stroke-width':1.5},g);
+    el('circle',{cx:px-2,cy:py-2,r:2.5,fill:'rgba(255,255,255,.4)'},g);
+  }else if(t.shape==='ring'){
+    el('circle',{cx:px,cy:py,r:8,fill:'none',stroke:t.col,'stroke-width':4.5},g);
+  }else if(t.shape==='chunk'){
+    el('rect',{x:px-7,y:py-6,width:14,height:12,rx:4,fill:t.col,stroke:'rgba(0,0,0,.14)','stroke-width':1.2,
+      transform:`rotate(${R()*60-30} ${px} ${py})`},g);
+  }else if(t.shape==='mush'){
+    el('path',{d:`M${px-8},${py} a8,7 0 0 1 16,0 Z`,fill:t.col,stroke:'#c9a86f','stroke-width':1.2},g);
+    el('rect',{x:px-2.5,y:py,width:5,height:6,rx:2,fill:'#f2ead8'},g);
+  }else if(t.shape==='leaf'){
+    el('path',{d:`M${px},${py-8} q9,8 0,16 q-9,-8 0,-16`,fill:t.col},g);
+  }
+}
+
+/* ---------------- orders ---------------- */
+function makeOrder(){
+  const ids=Object.keys(S.recipes).filter(k=>S.recipes[k]);
+  const rec=RECIPES[ids[Math.floor(R()*ids.length)]];
+  const extra=[];
+  if(S.day>=3&&R()<.3)extra.push('extraCheese');
+  if(S.day>=4&&R()<.3)extra.push('wellBaked');
+  const o={id:++S.orderN,name:NAMES[Math.floor(R()*NAMES.length)],ava:AVAS[Math.floor(R()*AVAS.length)],
+    recipe:rec,extraCheese:extra.includes('extraCheese'),wellBaked:extra.includes('wellBaked'),
+    patience:1,speed:(.009+S.day*.0012)/60,house:Math.floor(R()*HOUSES.length),served:false};
+  S.orders.push(o);
+  renderQueue();
+  sDing();
+  toast('📞 New order! '+(S.orders.length>1?'Tap its card to start it.':'Tap the card to begin!'));
+}
+function setActive(id){
+  if(S.bake){toast('The oven is busy — wait for the pizza! 🔥');return;}
+  const o=S.orders.find(o=>o.id===id);
+  if(!o)return;
+  if(S.build&&S.build.state!=='baked'&&(S.build.sauceCells.size||S.build.cheese)){
+    toast('Finish this pizza first — hand it to Zippy! 🛵');return;
+  }
+  S.activeOrder=o;
+  startBuild();
+  renderQueue();
+}
+function startBuild(){
+  $('gSauce').innerHTML='';$('gCheese').innerHTML='';$('gTop').innerHTML='';
+  drawDough();
+  S.build=newBuild(S.activeOrder);
+  updateHint();
+  renderBins();
+  const o=S.activeOrder;
+  const topsTxt=Object.entries(o.recipe.tops).map(([t,n])=>TOPPINGS[t].e+'×'+n).join(' ');
+  toast(`Build: <b>${o.recipe.n}</b>${o.extraCheese?' + EXTRA cheese 🧀':''}${o.wellBaked?' (well-baked 🔥)':''}<br>${topsTxt}`);
+}
+function updateHint(){
+  const b=S.build;
+  if(!b){$('buildHint').textContent='Take an order! 📋';return;}
+  if(b.sauceCells.size<9)$('buildHint').textContent='🥄 swipe sauce all over';
+  else if(b.cheese<b.cheeseNeed)$('buildHint').textContent='🧀 tap cheese '+b.cheese+'/'+b.cheeseNeed;
+  else{
+    const t=Object.entries(b.order.recipe.tops).filter(([k])=>b.tops[k]<(b.order.recipe.tops[k]));
+    if(t.length)$('buildHint').textContent=t.map(([k])=>TOPPINGS[k].e+' '+(b.tops[k]||0)+'/'+b.order.recipe.tops[k]).join(' · ');
+    else $('buildHint').textContent=b.state==='baked'?'Box it up! 📦':'Into the oven! 🔥';
+  }
+}
+function renderQueue(){
+  const q=$('queue');q.innerHTML='';
+  S.orders.forEach(o=>{
+    const d=document.createElement('div');
+    d.className='ocard'+(S.activeOrder&&S.activeOrder.id===o.id?' active':'');
+    const face=o.patience>.66?'😊':o.patience>.33?'😐':'😟';
+    const topsTxt=Object.entries(o.recipe.tops).map(([t,n])=>TOPPINGS[t].e+'×'+n).join(' ')||'🧀';
+    d.innerHTML=`<div class="face">${face}</div>
+      <div class="row1"><div class="ava">${o.ava}</div><div class="nm">${o.name}<br><b style="color:#b0402f">${o.recipe.e} ${o.recipe.n}</b></div></div>
+      <div class="req">${topsTxt}${o.extraCheese?' +🧀✨':''}${o.wellBaked?' 🔥🔥':''}</div>
+      <div class="pat"><div class="patf" style="width:${o.patience*100}%"></div></div>`;
+    d.addEventListener('click',()=>{audioInit();sPop();setActive(o.id);});
+    q.appendChild(d);
+  });
+}
+
+/* ---------------- oven ---------------- */
+$('ovenBtn').addEventListener('click',()=>{
+  audioInit();
+  const b=S.build;
+  if(S.bake){extract();return;}
+  if(!b){toast('Take an order first! 📋');return;}
+  if(b.sauceCells.size<9){toast('More sauce! Swipe the ladle 🥄');return;}
+  if(b.cheese<b.cheeseNeed){toast('More cheese! Tap tap tap 🧀');return;}
+  const totalNeed=Object.values(b.recipe2?{}:b.order.recipe.tops).reduce((a,c)=>a+c,0);
+  const total=Object.values(b.tops).reduce((a,c)=>a+c,0);
+  if(total<totalNeed){toast('Toppings are missing! Check the card 📋');return;}
+  S.bake={t:0,dur:(b.order.wellBaked?4.4:3.6)*ovenSpeed(),zone0:b.order.wellBaked?.62:.42,
+          zone1:(b.order.wellBaked?.62:.42)+zoneW(),done:false,b};
+  b.state='baking';
+  $('oven').classList.add('baking');
+  $('ovenBtn').textContent='📦 PULL OUT';
+  $('buildHint').textContent='watch the bar… stop in green!';
+  sSizzle();
+});
+function bakeTick(dt){
+  if(!S.bake||S.bake.done)return;
+  S.bake.t+=dt;
+  const p=S.bake.t/S.bake.dur;
+  $('bakeFill').style.width=Math.min(100,p*100)+'%';
+  // zone visual
+  const bar=$('bakeBar');
+  if(!bar.querySelector('.zone')){
+    const z=document.createElement('div');z.className='zone';
+    z.style.left=(S.bake.zone0*100)+'%';z.style.width=((S.bake.zone1-S.bake.zone0)*100)+'%';
+    z.style.background='rgba(255,220,90,.85)';
+    bar.appendChild(z);
+  }
+  if(p>=1){extract(true);}
+}
+function extract(burnt){
+  const bk=S.bake;if(!bk)return;
+  bk.done=true;S.bake=null;
+  $('oven').classList.remove('baking');
+  const bar=$('bakeBar');const z=bar.querySelector('.zone');if(z)z.remove();
+  $('bakeFill').style.width='0%';
+  $('ovenBtn').textContent='🪵 BAKE';
+  const p=burnt?1:bk.t/bk.dur;
+  let res;
+  if(burnt||p>bk.zone1)res='burnt';
+  else if(p>=bk.zone0)res='perfect';
+  else res='pale';
+  if(res==='burnt'){toast('🔥 Oh no, burnt! Let\u2019s remake it…');sSad();remake();}
+  else if(res==='pale'){toast('😅 A little pale… but they\u2019ll still eat it! (small tip)');finishBuild(.6);}
+  else{toast('✨ PERFECTLY BAKED!');sDing();finishBuild(1);}
+}
+function remake(){
+  const o=S.activeOrder;
+  $('gSauce').innerHTML='';$('gCheese').innerHTML='';$('gTop').innerHTML='';
+  S.build=newBuild(o);updateHint();
+}
+function finishBuild(bakeQ){
+  S.build.state='baked';
+  S.build.bakeQ=bakeQ;
+  $('handBtn').style.display='block';
+  updateHint();
+}
+
+/* ---------------- delivery ---------------- */
+$('handBtn').addEventListener('click',()=>{
+  audioInit();
+  const b=S.build;if(!b||b.state!=='baked')return;
+  const sc=S.scooters.find(s=>!s.busy);
+  if(!sc){toast('Scooters are out! Wait for Zippy 🛵');return;}
+  const o=S.activeOrder;
+  // score accuracy
+  let acc=1;
+  const b2=b;
+  Object.entries(o.recipe.tops).forEach(([k,n])=>{
+    const diff=Math.abs((b2.tops[k]||0)-n);
+    if(diff>0)acc-=diff*.12;
+  });
+  acc-=b2.wrong*.15;
+  acc*=b2.bakeQ;
+  acc-=b2.cheese>b2.cheeseNeed?0:0;
+  const stars=acc>=.85?3:acc>=.6?2:1;
+  const tipBase=Math.round(6+o.patience*10+stars*3);
+  o.served=true;o.stars=stars;o.tip=tipBase;
+  S.served++;
+  // remove order
+  S.orders=S.orders.filter(x=>x.id!==o.id);
+  S.activeOrder=null;S.build=null;
+  $('handBtn').style.display='none';
+  renderQueue();updateHint();
+  sc.busy=1;
+  runDelivery(sc,o);
+});
+function runDelivery(sc,o){
+  const ov=$('mapOv');ov.classList.add('show');
+  $('mapTitle').textContent='🗺️ '+o.name+'\u2019s house';
+  drawMap(o.house);
+  $('mapMsg').innerHTML='Zippy is loaded! Tap him to GO! 🛵';
+  sZoom();sBell();
+  // tap scooter to launch
+  const g=$('mapG');
+  const launch=()=>{
+    g.removeEventListener('click',launch);
+    animateScooter(o.house,()=>{
+      ov.classList.remove('show');
+      sc.busy=0;
+      S.coins+=o.tip;save();updHud();sCoin();
+      if(o.stars===3){sYay();toast(`🏠 ${o.name}: “Perfect pizza! Thank you!” +🪙${o.tip} ⭐⭐⭐`);}
+      else if(o.stars===2)toast(`🏠 ${o.name}: “Yummy! Thanks!” +🪙${o.tip} ⭐⭐`);
+      else toast(`🏠 ${o.name}: “It\u2019s okay…” +🪙${o.tip} ⭐`);
+      checkDayEnd();
+    });
+  };
+  g.addEventListener('click',launch);
+}
+function drawMap(hi){
+  const g=$('mapG');g.innerHTML='';
+  // park + streets + houses
+  el('rect',{x:0,y:0,width:340,height:300,fill:'#cfe3c0'},g);
+  const road=(x1,y1,x2,y2)=>el('line',{x1,y1,x2,y2,stroke:'#e8e2d2','stroke-width':16,'stroke-linecap':'round'},g);
+  road(60,50,280,50);road(60,150,280,150);road(60,250,280,250);
+  road(60,50,60,250);road(170,50,170,250);road(280,50,280,250);
+  el('line',{x1:60,y1:50,x2:60,y2:250,stroke:'#fff','stroke-width':1.5,'stroke-dasharray':'8 8'},g);
+  // shop
+  el('rect',{x:132,y:104,width:36,height:30,rx:4,fill:'#e2574c',stroke:'#a8382e','stroke-width':2},g);
+  el('text',{x:150,y:124,'font-size':13,'text-anchor':'middle'},g).textContent='🍕';
+  el('text',{x:150,y:146,'font-size':8,'text-anchor':'middle',fill:'#5a3d1c','font-weight':'700'},g).textContent='YOUR SHOP';
+  HOUSES.forEach((h,i)=>{
+    const isT=i===hi;
+    el('rect',{x:h[0]-13,y:h[1]-11,width:26,height:22,rx:3,fill:isT?'#ffd98f':'#e8d9c4',
+      stroke:isT?'#e29b2c':'#c9a86f','stroke-width':isT?3:2},g);
+    el('path',{d:`M${h[0]-15},${h[1]-11} L${h[0]},${h[1]-20} L${h[0]+15},${h[1]-11} Z`,
+      fill:isT?'#e2574c':'#b5773a'},g);
+    if(isT){
+      el('circle',{cx:h[0],cy:h[1],r:26,fill:'none',stroke:'#e2574c','stroke-width':3,class:'pulse'},g);
+      el('text',{x:h[0],y:h[1]+36,'font-size':9,'text-anchor':'middle',fill:'#b0402f','font-weight':'700'},g).textContent='HERE!';
+    }
+  });
+  // scooter at shop door
+  el('text',{x:150,y:170,'font-size':17,id:'scoot'},g).textContent='🛵';
+}
+function animateScooter(hi,done){
+  const g=$('mapG');
+  const scoot=g.querySelector('#scoot');
+  const path=[[170,150],[170,50],[60,50],[60,150],[60,250],[170,250],[280,250],[280,150],[170,150]];
+  const h=HOUSES[hi];
+  // simple 2-segment route via nearest junctions — precomputed simple: shop(170,150)->(hx side)
+  const route=[[170,165]];
+  route.push([170,h[1]>150?250:50]);
+  route.push([h[0]<170?60:280,h[1]>150?250:50]);
+  route.push([h[0],h[1]>150?250:50]);
+  route.push([h[0],h[1]]);
+  let seg=0,t=0;
+  $('mapMsg').textContent='🛵 Zippy is off! vroom vroom…';
+  sZoom();
+  const iv=setInterval(()=>{
+    t+=.045;
+    if(t>=1){t=0;seg++;}
+    if(seg>=route.length-1){
+      clearInterval(iv);
+      $('mapMsg').innerHTML='📦 Delivered! 🎉';
+      setTimeout(done,450);
+      return;
+    }
+    const a=route[seg],b2=route[seg+1];
+    const x=a[0]+(b2[0]-a[0])*t,y=a[1]+(b2[1]-a[1])*t;
+    scoot.setAttribute('x',x);
+    scoot.setAttribute('y',y+6);
+  },40);
+}
+
+/* ---------------- day loop ---------------- */
+function startDay(){
+  S.orders=[];S.activeOrder=null;S.build=null;S.bake=null;
+  S.served=0;S.walked=0;S.orderN=0;
+  S.ordersLeft=3+Math.min(S.day-1,5);
+  renderQueue();drawDough();updateHint();
+  $('dayPill').textContent='Day '+S.day;
+  updHud();
+  S.phase='day';
+  scheduleNext(1.2);
+}
+function scheduleNext(t){
+  if(S.ordersLeft<=0)return;
+  S.nextT=t;
+}
+function dayTick(dt){
+  if(S.phase!=='day')return;
+  if(S.ordersLeft>0){
+    S.nextT-=dt;
+    if(S.nextT<=0){
+      S.ordersLeft--;
+      makeOrder();
+      scheduleNext(Math.max(3.5,9-S.day*.8)+R()*3);
+    }
+  }
+  // patience
+  S.orders.forEach(o=>{
+    o.patience-=o.speed*dt;
+    if(o.patience<=0){
+      o.patience=0;
+      S.orders=S.orders.filter(x=>x.id!==o.id);
+      if(S.activeOrder&&S.activeOrder.id===o.id){
+        S.activeOrder=null;S.build=null;S.bake=null;
+        $('oven').classList.remove('baking');$('ovenBtn').textContent='🪵 BAKE';
+        $('gSauce').innerHTML='';$('gCheese').innerHTML='';$('gTop').innerHTML='';
+        $('handBtn').style.display='none';drawDough();updateHint();
+      }
+      S.walked++;
+      sSad();
+      toast(`😔 ${o.name} got hungry and left… next one!`);
+      renderQueue();checkDayEnd();
+    }
+  });
+  renderQueue(); // cheap enough, updates bars
+}
+function checkDayEnd(){
+  if(S.phase!=='day')return;
+  if(S.ordersLeft<=0&&S.orders.length===0&&S.scooters.every(s=>!s.busy)&&!S.bake){
+    S.phase='summary';
+    const stars=S.walked===0&&S.served>0?3:S.walked<=1?2:1;
+    S.day++;save();
+    $('sumTitle').textContent='🌙 Day '+(S.day-1)+' complete!';
+    $('sumStars').textContent='⭐'.repeat(stars)+'☆'.repeat(3-stars);
+    $('sumText').innerHTML=`Served: <b>${S.served}</b> · Walked out: <b>${S.walked}</b><br>Ready for Day ${S.day}!`;
+    setTimeout(()=>{$('sumOv').classList.add('show');sBell();},600);
+  }
+}
+
+/* ---------------- shop ---------------- */
+const SHOP=[
+ {id:'veg',ic:'🥬',nm:'Recipe: Garden Veggie',ds:'Customers can now order the Garden Veggie 🥬',price:15},
+ {id:'tikka',ic:'🍗',nm:'Recipe: Chicken Tikka',ds:'Spicy favourite — chicken & onion 🍗🧅',price:20},
+ {id:'pep',ic:'🔴',nm:'Recipe: Beef Pepperoni',ds:'The classic — beef pepperoni & olives 🔴🫒',price:20},
+ {id:'haw',ic:'🍍',nm:'Recipe: Chicken & Pineapple',ds:'Sweet & salty surprise 🍍',price:25},
+ {id:'fastoven',ic:'⚡',nm:'Turbo Oven',ds:'Bakes 28% faster',price:22},
+ {id:'ovenmitts',ic:'🧤',nm:'Oven Mitts',ds:'Bigger green zone — easier perfect bakes',price:18},
+ {id:'scooter2',ic:'🛵',nm:'2nd Scooter',ds:'Two deliveries at once!',price:30},
+];
+const RECMAP={veg:'veggie',tikka:'tikka',pep:'pep',haw:'hawaiian'};
+function renderShop(){
+  $('shopCoins').textContent=S.coins;
+  const box=$('shopList');box.innerHTML='';
+  SHOP.forEach(it=>{
+    const owned=S.upgrades[it.id]||(RECMAP[it.id]&&S.recipes[RECMAP[it.id]]);
+    const d=document.createElement('div');
+    d.className='shopItem'+(owned?' owned':'');
+    d.innerHTML=`<div class="ic">${it.ic}</div><div><div class="nm">${it.nm}</div><div class="ds">${it.ds}</div></div>
+      <div class="pr">${owned?'✓ owned':'🪙 '+it.price}</div>`;
+    if(!owned)d.addEventListener('click',()=>{
+      if(S.coins>=it.price){
+        S.coins-=it.price;
+        if(RECMAP[it.id])S.recipes[RECMAP[it.id]]=true;
+        else S.upgrades[it.id]=true;
+        if(it.id==='scooter2')S.scooters.push({busy:0});
+        save();updHud();sCoin();sYay();
+        toast('Bought: '+it.nm+' ✨');
+        renderShop();
+      }else{sSad();toast('Not enough coins — serve more pizzas! 🍕');}
+    });
+    box.appendChild(d);
+  });
+}
+$('shopBtn').addEventListener('click',()=>{
+  audioInit();sPop();
+  if(S.phase==='day'){toast('Finish the day first! 🍕');return;}
+  renderShop();$('shopOv').classList.add('show');
+});
+$('btnShopClose').addEventListener('click',()=>{sPop();$('shopOv').classList.remove('show');});
+$('btnShop').addEventListener('click',()=>{sPop();$('sumOv').classList.remove('show');renderShop();$('shopOv').classList.add('show');});
+$('btnNext').addEventListener('click',()=>{
+  sPop();$('sumOv').classList.remove('show');showDayIntro();
+});
+
+/* ---------------- day intro ---------------- */
+function showDayIntro(){
+  $('dayTitle').textContent=['☀️','🌤️','🔥','🌪️','👑'][Math.min(Math.floor((S.day-1)/2),4)]+' Day '+S.day;
+  const n=3+Math.min(S.day-1,5);
+  let extra='Orders are simple — build, bake, deliver!';
+  if(S.day===2)extra='More orders at once — keep an eye on patience!';
+  if(S.day===3)extra='Some customers want EXTRA cheese 🧀✨';
+  if(S.day===4)extra='Some want it WELL-BAKED 🔥🔥 — stop the bar in the late green!';
+  $('dayText').innerHTML=`${n} customers today.<br>${extra}`;
+  $('dayOv').classList.add('show');
+}
+$('btnDay').addEventListener('click',()=>{
+  audioInit();sPop();
+  $('dayOv').classList.remove('show');
+  startDay();
+  toast('🔔 The shop is OPEN! First order coming…');
+});
+
+/* ---------------- bins & drag ---------------- */
+function renderBins(){
+  const row=$('binRow');row.innerHTML='';
+  const items=[['sauce','Sauce Ladle','🥄'],['cheese','Cheese','🧀'],...Object.keys(TOPPINGS).map(k=>[k,TOPPINGS[k].n,TOPPINGS[k].e])];
+  items.forEach(([id,nm,em])=>{
+    const d=document.createElement('div');
+    d.className='bin';d.dataset.id=id;
+    let cnt='';
+    if(S.build&&S.build.order.recipe.tops[id])cnt=`<div class="cnt">${S.build.tops[id]||0}/${S.build.order.recipe.tops[id]}</div>`;
+    d.innerHTML=`<div class="em">${em}</div><div class="nm">${nm}</div>${cnt}`;
+    row.appendChild(d);
+  });
+}
+/* carrying ghost — drag starts after a small move so the bin row can still scroll */
+let carry=null, pressBin=null;
+const ghost=document.createElement('div');
+ghost.style.cssText='position:fixed;z-index:99;pointer-events:none;font-size:2rem;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3));display:none;transform:translate(-50%,-60%)';
+document.body.appendChild(ghost);
+document.addEventListener('pointerdown',e=>{
+  if(!S.started||S.phase!=='day')return;
+  const bin=e.target.closest('.bin');
+  if(!bin)return;
+  audioInit();
+  pressBin={id:bin.dataset.id,x:e.clientX,y:e.clientY};
+});
+document.addEventListener('pointermove',e=>{
+  if(pressBin&&!carry){
+    if(pressBin.id==='cheese')return;              // cheese is a tap, not a drag
+    if(Math.hypot(e.clientX-pressBin.x,e.clientY-pressBin.y)<12)return;
+    carry={kind:pressBin.id};pressBin=null;
+    ghost.textContent=carry.kind==='sauce'?'🥄':TOPPINGS[carry.kind].e;
+    ghost.style.display='block';
+  }
+  if(!carry)return;
+  ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
+  if(carry.kind==='sauce'){
+    const p=pizzaSvgPt(e.clientX,e.clientY);
+    if(p)paintSauce(p.x,p.y);
+  }
+});
+document.addEventListener('pointerup',e=>{
+  pressBin=null;
+  if(!carry)return;
+  const kind=carry.kind;carry=null;ghost.style.display='none';
+  if(kind!=='sauce'){
+    const p=pizzaSvgPt(e.clientX,e.clientY);
+    if(p)dropTopping(kind,p.x,p.y);
+  }
+  updateHint();renderBins();
+});
+document.addEventListener('click',e=>{
+  if(!S.started||S.phase!=='day')return;
+  const bin=e.target.closest('.bin');
+  if(!bin)return;
+  if(bin.dataset.id==='cheese'){addCheese();updateHint();renderBins();}
+});
+function pizzaSvgPt(cx,cy){
+  const svg=$('pizzaSvg');
+  const r=svg.getBoundingClientRect();
+  if(cx<r.left||cx>r.right||cy<r.top||cy>r.bottom)return null;
+  const p=svg.createSVGPoint();p.x=cx;p.y=cy;
+  return p.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+/* ---------------- misc ---------------- */
+function toast(html){
+  const t=$('toast');
+  t.innerHTML=html;t.style.display='block';
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>t.style.display='none',2600);
+}
+function updHud(){$('coinTxt').textContent=S.coins;}
+
+/* ---------------- main loop ---------------- */
+let last=performance.now();
+setInterval(()=>{
+  const now=performance.now();
+  const dt=clamp((now-last)/1000,0,.1);last=now;
+  if(!S.started||S.paused)return;
+  if(S.phase==='day'){
+    dayTick(dt);
+    bakeTick(dt);
+    updateHint();
+  }
+},50);
+
+/* ---------------- start ---------------- */
+$('btnStart').addEventListener('click',()=>{
+  audioInit();sPop();
+  $('startOv').classList.remove('show');
+  S.started=true;
+  renderBins();
+  showDayIntro();
+});
+
+/* ---------------- test hooks ---------------- */
+window.__pp={
+  S,RECIPES,TOPPINGS,
+  start(){document.getElementById('btnStart').click();},
+  beginDay(){document.getElementById('btnDay').click();},
+  makeOrder,renderQueue,renderBins,updHud,
+  paint:(x,y)=>paintSauce(x,y),
+  cheese:n=>{for(let i=0;i<(n||3);i++)addCheese();updateHint();renderBins();},
+  drop:(k,n)=>{const t=S.build.order.recipe.tops[k]||n||1;
+    for(let i=0;i<(n||t);i++)dropTopping(k,60+R()*180,60+R()*180);updateHint();renderBins();},
+  bakePerfect:()=>{const bk=S.bake;if(bk)bk.t=bk.dur*(bk.zone0+bk.zone1)/2;},
+  pull:()=>extract(),
+  hand:()=>document.getElementById('handBtn').click(),
+  launch:()=>document.getElementById('mapG').dispatchEvent(new Event('click')),
+  fastDeliver(){const o=S.activeOrder||S.orders[0];},
+};
+})();
+</script>
+</body>
+</html>
